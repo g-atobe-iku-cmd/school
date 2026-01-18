@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ひらがな・かたかな クイズ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&family=M+PLUS_Rounded+1c:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #fff9db;
+        }
+        .font-kiwi {
+            font-family: 'Kiwi Maru', serif;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 transition-colors duration-500" id="body-bg">
+
+    <div id="app-container" class="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border-4 border-yellow-400 transition-all duration-500 relative">
+        <!-- Header -->
+        <div id="header" class="bg-yellow-400 p-6 text-gray-800 text-center transition-colors duration-500">
+            <div id="level-badge" class="inline-block bg-white px-3 py-1 rounded-full text-xs font-bold mb-2 shadow-sm text-yellow-600">
+                レベル 1：ふつう
+            </div>
+            <h1 id="header-title" class="text-2xl font-bold font-kiwi">
+                ひらがな・かたかな クイズ
+            </h1>
+            <p id="header-subtitle" class="text-sm font-bold opacity-80">どっちで かくのが ただしいかな？</p>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="p-6 text-center">
+            <div class="mb-6">
+                <span class="text-7xl" id="start-emoji">✏️</span>
+            </div>
+            
+            <!-- これまでのきろく -->
+            <div id="history-section" class="mb-8 p-5 bg-orange-50 rounded-3xl border-2 border-orange-200 text-left shadow-inner">
+                <h3 class="text-lg font-bold text-orange-700 mb-4 flex items-center gap-2">
+                    <span>🏅</span> これまでの きろく
+                </h3>
+                <div id="history-list" class="grid grid-cols-1 gap-3">
+                    <!-- JSで挿入されます -->
+                </div>
+                <button onclick="resetRecords()" class="mt-4 text-[10px] text-gray-400 underline w-full text-center">きろくを リセットする</button>
+            </div>
+
+            <h2 class="text-xl font-bold mb-4 text-gray-700">じゅんびは いいかな？</h2>
+            <div id="start-buttons" class="space-y-3">
+                <button onclick="startQuiz(1)" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-5 rounded-2xl transition transform active:scale-95 shadow-lg text-2xl">
+                    スタート！
+                </button>
+            </div>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="p-6 hidden">
+            <div class="flex justify-between items-center mb-6 text-sm font-bold text-gray-500">
+                <span id="progress-text">だい 1 もん / 10</span>
+                <span id="score-text">てんすう: 0</span>
+            </div>
+
+            <div class="mb-8 text-center">
+                <p id="question-text" class="text-lg text-gray-600 mb-4 font-bold"></p>
+                <div id="main-word" class="text-7xl font-bold text-gray-800 font-kiwi py-10 bg-yellow-50 rounded-2xl border-4 border-dotted border-yellow-200"></div>
+            </div>
+
+            <div id="options-container" class="grid grid-cols-1 gap-4"></div>
+
+            <div id="feedback" class="mt-6 p-5 rounded-2xl hidden text-center border-2">
+                <p id="feedback-message" class="font-bold text-2xl mb-2"></p>
+                <p id="explanation" class="text-base text-gray-700 leading-relaxed"></p>
+                <button id="next-btn" onclick="nextQuestion()" class="mt-6 bg-gray-800 text-white px-10 py-3 rounded-full text-lg font-bold hover:bg-gray-700 transition active:scale-95">
+                    つぎへ →
+                </button>
+            </div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-screen" class="p-8 text-center hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">おわり！</h2>
+            <div class="text-7xl mb-6" id="result-emoji">🏆</div>
+            <p class="text-xl mb-2">あなたの てんすう</p>
+            <div class="text-6xl font-bold text-orange-500 mb-8" id="final-score">0 / 10</div>
+            
+            <div id="result-actions" class="space-y-4">
+                <button id="levelup-btn-result" onclick="goToNextLevel()" class="hidden w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-5 rounded-2xl transition transform active:scale-95 shadow-lg text-xl">
+                    🚀 つぎの レベルへ！
+                </button>
+                <button onclick="backToTitle()" class="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-800 font-bold py-5 rounded-2xl transition transform active:scale-95 shadow-lg text-xl">
+                    タイトルに もどる
+                </button>
+            </div>
+        </div>
+
+        <!-- Celebration Popup -->
+        <div id="celebration-overlay" class="absolute inset-0 bg-black/40 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-3xl p-8 m-4 shadow-2xl text-center animate-pop border-4 border-yellow-400 max-w-[90%]">
+                <div class="text-6xl mb-4" id="celeb-emoji">🎉</div>
+                <h3 id="celeb-title" class="text-2xl font-bold text-orange-600 mb-2">すごーい！！</h3>
+                <p id="celeb-message" class="text-gray-700 font-bold mb-6">レベルクリア おめでとう！</p>
+                
+                <div class="flex flex-col gap-3">
+                    <button id="celeb-next-level-btn" onclick="goToNextLevelFromPop()" class="hidden bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl shadow-lg hover:bg-blue-600 transition text-lg active:scale-95">
+                        🚀 つぎのレベルに すすむ！
+                    </button>
+                    <button onclick="closeCelebration()" class="bg-orange-500 text-white font-bold px-8 py-3 rounded-full shadow-lg hover:bg-orange-600 transition active:scale-95">
+                        やったね！
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'hiragana_katakana_quiz_scores';
+        let userRecords = { 1: 0, 2: 0, 3: 0 };
+
+        // データの読み込みと画面の更新をセットで行う
+        function syncRecordsWithUI() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                userRecords = JSON.parse(saved);
+            }
+            updateHistoryUI();
+        }
+
+        function updateHistoryUI() {
+            const list = document.getElementById('history-list');
+            if(!list) return;
+            const levelNames = { 1: "ふつう", 2: "むずかしい", 3: "ちょうむず" };
+            const levelColors = { 1: "bg-yellow-100 text-yellow-800", 2: "bg-blue-100 text-blue-800", 3: "bg-red-100 text-red-800" };
+            
+            list.innerHTML = [1, 2, 3].map(lv => {
+                const score = userRecords[lv] || 0;
+                return `
+                    <div class="flex items-center justify-between p-3 rounded-2xl bg-white shadow-sm border border-orange-100">
+                        <div class="flex items-center gap-3">
+                            <span class="w-8 h-8 flex items-center justify-center rounded-full font-bold ${levelColors[lv]} text-sm">${lv}</span>
+                            <span class="font-bold text-gray-700">${levelNames[lv]}</span>
+                        </div>
+                        <span class="text-2xl font-bold ${score > 0 ? 'text-orange-500' : 'text-gray-300'}">${score}<span class="text-sm text-gray-400"> / 10</span></span>
+                    </div>`;
+            }).join('');
+        }
+
+        function saveCurrentScore(level, score) {
+            const currentBest = userRecords[level] || 0;
+            if (score > currentBest) {
+                userRecords[level] = score;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(userRecords));
+                // 保存したらすぐにUIも更新
+                updateHistoryUI();
+            }
+        }
+
+        window.resetRecords = function() {
+            if(confirm("きろくを ぜんぶ けしても いいですか？")) {
+                userRecords = { 1: 0, 2: 0, 3: 0 };
+                localStorage.removeItem(STORAGE_KEY);
+                updateHistoryUI();
+            }
+        };
+
+        const quizLevels = {
+            1: [
+                { q: "これは どっちかな？", word: "🍎", options: ["りんご", "リンゴ"], correct: 0, explanation: "にほんの たべものは、ひらがなで かくよ。" },
+                { q: "これは どっちかな？", word: "🎒", options: ["らんどせる", "ランドセル"], correct: 1, explanation: "ランドセルは がいこくの ことばだから かたかなだよ。" },
+                { q: "これは どっちかな？", word: "🍦", options: ["そふとくりーむ", "ソフトクリーム"], correct: 1, explanation: "ソフトクリームは がいこくの たべものだね。" },
+                { q: "これは どっちかな？", word: "🍣", options: ["おすし", "オスシ"], correct: 0, explanation: "おすしは にほんの たべものだから、ひらがなだね。" },
+                { q: "ねこの なきごえは？", word: "🐈", options: ["にゃーにゃー", "ニャーニャー"], correct: 1, explanation: "なきごえは かたかなで かくと 正解だよ。" },
+                { q: "これは どっちかな？", word: "🎹", options: ["ぴあの", "ピアノ"], correct: 1, explanation: "ピアノは がいこくの がっきだから かたかなだね。" },
+                { q: "これは どっちかな？", word: "🌸", options: ["さくら", "サクラ"], correct: 0, explanation: "にほんの はなは ひらがなで かこう。" },
+                { q: "かえるの なきごえは？", word: "🐸", options: ["げろげろ", "ゲロゲロ"], correct: 1, explanation: "なきごえや おとは かたかなで かくよ。" },
+                { q: "これは どっちかな？", word: "🍌", options: ["ばなな", "バナナ"], correct: 1, explanation: "バナナは がいこくの くだものだね。" },
+                { q: "これは どっちかな？", word: "🚗", options: ["くるま", "クルマ"], correct: 0, explanation: "にほんの ことばは ひらがなだよ。" }
+            ],
+            2: [
+                { q: "のばす おとに ちゅうい！", word: "🍫", options: ["ちょこれーと", "チョコレート"], correct: 1, explanation: "かたかなの のばす おとは「ー」を つかうよ。" },
+                { q: "どっちが ただしいかな？", word: "🍳", options: ["おむれつ", "オムレツ"], correct: 1, explanation: "オムレツは がいこくの たべものだから かたかなだよ。" },
+                { q: "どっちが ただしいかな？", word: "🍡", options: ["だんご", "ダンゴ"], correct: 0, explanation: "だんごは にほんの たべもの。ひらがなが 正解。" },
+                { q: "おてらの かねの おとは？", word: "🔔", options: ["ごーん", "ゴーン"], correct: 1, explanation: "ものの おとは かたかなで かくよ。" },
+                { q: "どっちが ただしいかな？", word: "🐰", options: ["うさぎ", "ウサギ"], correct: 0, explanation: "うさぎは にほんの どうぶつ。ひらがなで かこう。" },
+                { q: "どっちが ただしいかな？", word: "🍞", options: ["ぱん", "パン"], correct: 1, explanation: "パンは がいこくの ことばだよ。" },
+                { q: "どっちが ただしいかな？", word: "🎽", options: ["えぷろん", "エプロン"], correct: 1, explanation: "エプロンは がいこくから きた ことばだね。" },
+                { q: "どっちが ただしいかな？", word: "🗻", options: ["ふじさん", "フジサン"], correct: 0, explanation: "ふじさんは にほんの 山。ひらがなだね。" },
+                { q: "あめが ふる おとは？", word: "☔", options: ["ざーざー", "ザーザー"], correct: 1, explanation: "あめの おとも かたかなで かくよ。" },
+                { q: "どっちが ただしいかな？", word: "🥛", options: ["みるく", "ミルク"], correct: 1, explanation: "ミルクは がいこくの 言葉だからカタカナだよ。" }
+            ],
+            3: [
+                { q: "がいこくの 国の なまえ！", word: "🇮🇳", options: ["いんど", "インド"], correct: 1, explanation: "インドは がいこくの 国の なまえだから かたかなが 正解！" },
+                { q: "日本の なまえは？", word: "🇯🇵", options: ["にっぽん", "ニッポン"], correct: 0, explanation: "じぶんの 国の なまえは ひらがなで かくよ。" },
+                { q: "がいこくの 国の なまえ！", word: "🇺🇸", options: ["あめりか", "アメリカ"], correct: 1, explanation: "がいこくの 国の なまえは かたかなで かこう。" },
+                { q: "どっちが 正しいかな？", word: "🥋", options: ["じゅうどう", "ジュウドウ"], correct: 0, explanation: "じゅうどうは 日本の スポーツだから ひらがなだよ。" },
+                { q: "がいこくの 人の なまえ！", word: "🎼", options: ["もーつあると", "モーツァルト"], correct: 1, explanation: "がいこくの 人の なまえも かたかなだね。" },
+                { q: "日本の ぶんか！", word: "👘", options: ["きもの", "キモノ"], correct: 0, explanation: "きものは 日本の ふく。ひらがなが 正解。" },
+                { q: "まじりあった かきかた！", word: "🍜", options: ["ラーめン", "ラーメン"], correct: 1, explanation: "かたかなの なかに ひらがなを まぜないように！" },
+                { q: "日本の おまつり！", word: "🥁", options: ["たいこ", "タイコ"], correct: 0, explanation: "たいこは 日本の がっき。ひらがなで かこう。" },
+                { q: "どっちが 正しいかな？", word: "🎻", options: ["ばいおりん", "バイオリン"], correct: 1, explanation: "バイオリンは がいこくのがっきだよ。" },
+                { q: "日本の くだもの！", word: "🍊", options: ["みかん", "ミカン"], correct: 0, explanation: "みかんは 日本の くだもの. ひらがなが 正しいよ。" }
+            ]
+        };
+
+        let currentLevel = 1;
+        let currentQuestions = [];
+        let currentIndex = 0;
+        let score = 0;
+        let canAnswer = true;
+
+        window.startQuiz = function(level) {
+            currentLevel = level;
+            updateAppTheme(level);
+            currentQuestions = [...quizLevels[level]].sort(() => 0.5 - Math.random()).slice(0, 10);
+            
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            
+            currentIndex = 0;
+            score = 0;
+            showQuestion();
+        };
+
+        window.backToTitle = function() {
+            // 他の画面を隠してタイトルを表示
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            document.getElementById('levelup-btn-result').classList.add('hidden');
+            
+            // 重要：ここで最新の記録を反映させる
+            syncRecordsWithUI();
+            updateAppTheme(1);
+        };
+
+        function updateAppTheme(level) {
+            const app = document.getElementById('app-container');
+            const header = document.getElementById('header');
+            const badge = document.getElementById('level-badge');
+            const title = document.getElementById('header-title');
+            if (level === 3) {
+                app.style.borderColor = '#ef4444';
+                header.className = "bg-red-600 p-6 text-white text-center";
+                badge.innerText = "レベル 3：さいごの しれん";
+                badge.className = "inline-block bg-white px-3 py-1 rounded-full text-xs font-bold mb-2 shadow-sm text-red-600";
+                title.innerText = "🔥 ちょうむずかしい！";
+            } else if (level === 2) {
+                app.style.borderColor = '#42a5f5';
+                header.className = "bg-blue-500 p-6 text-white text-center";
+                badge.innerText = "レベル 2：むずかしい";
+                badge.className = "inline-block bg-white px-3 py-1 rounded-full text-xs font-bold mb-2 shadow-sm text-blue-600";
+                title.innerText = "🚀 レベルアップ！";
+            } else {
+                app.style.borderColor = '#fbbf24';
+                header.className = "bg-yellow-400 p-6 text-gray-800 text-center";
+                badge.innerText = "レベル 1：ふつう";
+                badge.className = "inline-block bg-white px-3 py-1 rounded-full text-xs font-bold mb-2 shadow-sm text-yellow-600";
+                title.innerText = "ひらがな・かたかな クイズ";
+            }
+        }
+
+        function showQuestion() {
+            const q = currentQuestions[currentIndex];
+            canAnswer = true;
+            document.getElementById('progress-text').innerText = `だい ${currentIndex + 1} もん / 10`;
+            document.getElementById('score-text').innerText = `てんすう: ${score}`;
+            document.getElementById('question-text').innerText = q.q;
+            document.getElementById('main-word').innerText = q.word;
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full py-5 px-4 rounded-2xl border-4 border-gray-100 font-bold text-2xl hover:bg-gray-50 transition active:scale-95 bg-white shadow-sm text-gray-800";
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(idx);
+                container.appendChild(btn);
+            });
+            document.getElementById('feedback').classList.add('hidden');
+        }
+
+        window.checkAnswer = function(idx) {
+            if (!canAnswer) return;
+            canAnswer = false;
+            const q = currentQuestions[currentIndex];
+            const isCorrect = idx === q.correct;
+            const feedback = document.getElementById('feedback');
+            const options = document.getElementById('options-container').children;
+            feedback.classList.remove('hidden');
+            feedback.className = `mt-6 p-5 rounded-2xl text-center border-2 ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`;
+            document.getElementById('feedback-message').innerText = isCorrect ? "⭕️ せいかい！" : "❌ ざんねん！";
+            document.getElementById('feedback-message').className = `font-bold text-2xl mb-2 ${isCorrect ? 'text-green-600' : 'text-red-600'}`;
+            if (isCorrect) score++;
+            options[idx].classList.add(isCorrect ? 'border-green-500' : 'border-red-500');
+            options[q.correct].classList.add('border-green-500');
+            document.getElementById('explanation').innerText = q.explanation;
+            document.getElementById('score-text').innerText = `てんすう: ${score}`;
+        };
+
+        window.nextQuestion = function() {
+            currentIndex++;
+            if (currentIndex < 10) showQuestion();
+            else showResult();
+        };
+
+        function showResult() {
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = `${score} / 10`;
+            saveCurrentScore(currentLevel, score);
+            if (score === 10 && currentLevel < 3) document.getElementById('levelup-btn-result').classList.remove('hidden');
+            if (score >= 8) showCelebrationPopup();
+        }
+
+        function showCelebrationPopup() {
+            const overlay = document.getElementById('celebration-overlay');
+            overlay.classList.remove('hidden');
+            if (score === 10) {
+                document.getElementById('celeb-emoji').innerText = "👑";
+                document.getElementById('celeb-title').innerText = "✨ かんぺき！！ ✨";
+                if (currentLevel < 3) document.getElementById('celeb-next-level-btn').classList.remove('hidden');
+            }
+            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        }
+
+        window.closeCelebration = () => document.getElementById('celebration-overlay').classList.add('hidden');
+        window.goToNextLevelFromPop = () => { closeCelebration(); goToNextLevel(); };
+        window.goToNextLevel = () => { if (currentLevel < 3) startQuiz(currentLevel + 1); };
+
+        // 起動時
+        window.onload = syncRecordsWithUI;
+    </script>
+</body>
+</html>
