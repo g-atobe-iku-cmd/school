@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1000をこえる数：数直線マスター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&display=swap');
+        body {
+            font-family: 'Kiwi Maru', serif;
+            background-color: #f0fdf4;
+            overflow-x: hidden;
+        }
+        .number-line-container {
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 45px 40px 35px 40px;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            position: relative;
+        }
+        .tick {
+            display: inline-block;
+            position: relative;
+            border-left: 2px solid #374151;
+            margin-right: 24px; 
+            vertical-align: bottom;
+        }
+        .tick-large { height: 60px; border-left-width: 3px; }
+        .tick-medium { height: 40px; }
+        .tick-small { height: 25px; }
+        
+        .tick-label {
+            position: absolute;
+            top: 65px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            font-weight: bold;
+            color: #374151;
+        }
+        .pointer {
+            position: absolute;
+            top: 0px;
+            z-index: 50;
+            color: #ef4444;
+            pointer-events: none;
+            display: none;
+            transform: translateX(-50%);
+        }
+        .bounce {
+            animation: bounce 0.6s infinite alternate;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+        .pointer-icon {
+            font-size: 36px;
+            line-height: 1;
+        }
+        .pointer-box {
+            background-color: #ef4444;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: -5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 32px;
+            width: 32px;
+            border-radius: 50%;
+            background: #ef4444;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        .mask {
+            background-color: #3b82f6;
+            color: #3b82f6;
+            border-radius: 8px;
+            padding: 0 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .mask.show {
+            background-color: transparent;
+            color: #2563eb;
+        }
+
+        @keyframes combo-up {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .combo-text {
+            animation: combo-up 0.4s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="p-2 md:p-4">
+    <div class="max-w-5xl mx-auto bg-white p-4 md:p-6 rounded-3xl shadow-xl border-4 border-green-200">
+        <header class="text-center mb-2">
+            <h1 class="text-3xl font-bold text-green-700">10000までの すうちょくせん</h1>
+            <p class="text-gray-600 text-sm">大きな かずの めもりを よんでみよう！</p>
+        </header>
+
+        <div class="number-line-container mb-4" id="line-box">
+            <div id="quiz-pointer" class="pointer">
+                <div class="bounce">
+                    <div class="pointer-box">？</div>
+                    <div class="pointer-icon">▼</div>
+                </div>
+            </div>
+            
+            <div id="number-line" class="inline-flex items-end pb-12">
+                <!-- JavaScriptで生成 -->
+            </div>
+        </div>
+
+        <div id="control-panel" class="bg-yellow-50 p-2 md:p-4 rounded-2xl border-2 border-yellow-200 text-center">
+            <div id="mode-learning">
+                <h2 class="text-lg font-bold text-yellow-700 mb-2">🔍 めもりを しらべよう</h2>
+                
+                <div class="flex items-center justify-center gap-4 mb-2">
+                    <span class="text-base font-bold">どこをみる？:</span>
+                    <input type="range" id="study-slider" min="0" max="10000" step="100" value="0" class="w-2/3 h-4 bg-yellow-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+                
+                <div class="flex flex-col items-center gap-2 mb-2">
+                    <div class="text-4xl font-bold transition-all">
+                        かず： <span id="current-value-display" class="mask">0000</span>
+                    </div>
+                    <button id="toggle-value-btn" onclick="toggleMask()" class="text-lg bg-blue-500 text-white px-8 py-2 rounded-2xl hover:bg-blue-600 font-bold border-b-4 border-blue-700 transition shadow-lg active:mt-1 active:border-b-0">
+                        答えをみる
+                    </button>
+                </div>
+
+                <p class="text-sm text-gray-600 mb-2 font-bold italic">💡 小さいめもり 1つぶんは 「100」だよ</p>
+                
+                <!-- ヒントエリア -->
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                    <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                        <h3 class="font-bold text-blue-800 text-sm">💡 ヒント1</h3>
+                        <p class="text-gray-700 text-xs">いちばん 長い めもりは 「1000」ごとの かわりめだよ。</p>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded-xl border border-purple-100">
+                        <h3 class="font-bold text-purple-800 text-sm">💡 ヒント2</h3>
+                        <p class="text-gray-700 text-xs">みじかい めもり 1つぶんは 「100」だよ。10こ あつまると 1000になるね！</p>
+                    </div>
+                </div>
+
+                <!-- クイズ開始ボタンを一番下に配置 -->
+                <div class="mt-6">
+                    <button onclick="startQuiz()" class="px-10 py-3 bg-orange-500 text-white rounded-2xl shadow-lg hover:bg-orange-600 transition-all font-bold text-xl border-b-4 border-orange-700">
+                        クイズに ちょうせん！
+                    </button>
+                </div>
+            </div>
+
+            <div id="mode-quiz" class="hidden">
+                <div class="flex flex-col items-center mb-2">
+                    <div id="combo-display" class="text-lg font-bold text-orange-600 bg-white px-4 py-1 rounded-full shadow-inner border border-orange-200 invisible mb-1">
+                        🔥 <span id="combo-count">0</span>回 れんぞく せいかい！
+                    </div>
+                    <h2 class="text-xl font-bold text-red-600">あかい 矢印の かずは？</h2>
+                </div>
+                
+                <div class="flex flex-col items-center gap-2">
+                    <input type="number" id="quiz-answer" placeholder="すうじ" class="text-4xl p-2 border-4 border-red-300 rounded-xl w-64 text-center focus:outline-none focus:border-red-500">
+                    <div class="flex gap-4">
+                        <button onclick="checkAnswer()" class="px-8 py-3 bg-red-500 text-white rounded-2xl shadow-lg hover:bg-red-600 transition font-bold text-xl border-b-4 border-red-700">こたえあわせ</button>
+                        <button onclick="stopQuiz()" class="px-5 py-3 bg-gray-400 text-white rounded-2xl shadow-md hover:bg-gray-500 transition font-bold border-b-4 border-gray-600 text-lg">やめる</button>
+                    </div>
+                </div>
+                <div id="feedback" class="mt-2 text-2xl font-bold h-8"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const currentMax = 10000;
+        const step = 100; 
+        let quizTargetValue = 0;
+        let isMasked = true;
+        let combo = 0;
+
+        const numberLine = document.getElementById('number-line');
+        const studySlider = document.getElementById('study-slider');
+        const currentValueDisplay = document.getElementById('current-value-display');
+        const toggleBtn = document.getElementById('toggle-value-btn');
+        const quizPointer = document.getElementById('quiz-pointer');
+        const quizAnswerInput = document.getElementById('quiz-answer');
+        const feedback = document.getElementById('feedback');
+        const comboDisplay = document.getElementById('combo-display');
+        const comboCount = document.getElementById('combo-count');
+
+        function init() {
+            renderLine();
+            updateStudyValue();
+            studySlider.addEventListener('input', () => {
+                isMasked = true;
+                applyMaskState();
+                updateStudyValue();
+            });
+        }
+
+        function renderLine() {
+            numberLine.innerHTML = '';
+            const totalTicks = currentMax / step;
+
+            for (let i = 0; i <= totalTicks; i++) {
+                const val = i * step;
+                const tick = document.createElement('div');
+                tick.className = 'tick';
+                tick.id = `tick-${val}`;
+
+                if (i % 10 === 0) {
+                    tick.classList.add('tick-large');
+                    const label = document.createElement('div');
+                    label.className = 'tick-label';
+                    label.innerText = val;
+                    tick.appendChild(label);
+                } else if (i % 5 === 0) {
+                    tick.classList.add('tick-medium');
+                } else {
+                    tick.classList.add('tick-small');
+                }
+
+                numberLine.appendChild(tick);
+            }
+        }
+
+        function toggleMask() {
+            isMasked = !isMasked;
+            applyMaskState();
+        }
+
+        function applyMaskState() {
+            if (isMasked) {
+                currentValueDisplay.classList.remove('show');
+                toggleBtn.innerText = '答えをみる';
+                toggleBtn.classList.remove('bg-gray-400', 'border-gray-600');
+                toggleBtn.classList.add('bg-blue-500', 'border-blue-700');
+            } else {
+                currentValueDisplay.classList.add('show');
+                toggleBtn.innerText = '答えをかくす';
+                toggleBtn.classList.remove('bg-blue-500', 'border-blue-700');
+                toggleBtn.classList.add('bg-gray-400', 'border-gray-600');
+            }
+        }
+
+        function updateStudyValue() {
+            const val = parseInt(studySlider.value);
+            currentValueDisplay.innerText = val;
+            
+            const allTicks = document.querySelectorAll('.tick');
+            allTicks.forEach(t => t.style.borderColor = '#374151');
+            
+            const activeTick = document.getElementById(`tick-${val}`);
+            if (activeTick) {
+                activeTick.style.borderColor = '#ef4444';
+                activeTick.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+            }
+        }
+
+        function startQuiz() {
+            document.getElementById('mode-learning').classList.add('hidden');
+            document.getElementById('mode-quiz').classList.remove('hidden');
+            
+            const maxSteps = currentMax / step;
+            let newValue;
+            do {
+                newValue = Math.floor(Math.random() * maxSteps + 1) * step;
+            } while (newValue === quizTargetValue);
+            
+            quizTargetValue = newValue;
+            quizPointer.style.display = 'block';
+            
+            setTimeout(() => {
+                const targetTick = document.getElementById(`tick-${quizTargetValue}`);
+                if (targetTick) {
+                    const tickX = targetTick.offsetLeft;
+                    quizPointer.style.left = (tickX + 1) + 'px'; 
+                    targetTick.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }
+            }, 50);
+            
+            quizAnswerInput.value = '';
+            feedback.innerText = '';
+            quizAnswerInput.focus();
+        }
+
+        function stopQuiz() {
+            document.getElementById('mode-learning').classList.remove('hidden');
+            document.getElementById('mode-quiz').classList.add('hidden');
+            quizPointer.style.display = 'none';
+            isMasked = true;
+            applyMaskState();
+            combo = 0;
+            comboDisplay.classList.add('invisible');
+        }
+
+        function celebrate() {
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+
+        function checkAnswer() {
+            const userAns = parseInt(quizAnswerInput.value);
+            if (userAns === quizTargetValue) {
+                combo++;
+                celebrate();
+                
+                comboDisplay.classList.remove('invisible');
+                comboCount.innerText = combo;
+                comboDisplay.classList.remove('combo-text');
+                void comboDisplay.offsetWidth; 
+                comboDisplay.classList.add('combo-text');
+
+                feedback.innerText = '⭕ せいかい！';
+                feedback.className = 'mt-2 text-2xl font-bold text-green-600';
+                
+                setTimeout(() => {
+                    if (!document.getElementById('mode-quiz').classList.contains('hidden')) {
+                        startQuiz();
+                    }
+                }, 1200);
+            } else {
+                combo = 0;
+                comboDisplay.classList.add('invisible');
+                feedback.innerText = '❌ おしい！';
+                feedback.className = 'mt-2 text-2xl font-bold text-orange-500';
+            }
+        }
+
+        quizAnswerInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        window.onload = init;
+    </script>
+</body>
+</html>
